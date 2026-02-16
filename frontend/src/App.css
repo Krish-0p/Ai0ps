@@ -1053,3 +1053,84 @@ body {
     grid-template-columns: repeat(2, 1fr);
   }
 }
+
+
+.mode-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.mode-button {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px;
+  background: rgba(15, 23, 42, 0.4);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.mode-button:hover {
+  background: rgba(30, 41, 59, 0.8);
+  border-color: var(--text-tertiary);
+  transform: translateY(-2px);
+}
+
+.mode-icon {
+  margin-bottom: 4px;
+}
+
+/* Active States */
+.mode-button.active-fake {
+  background: rgba(0, 255, 136, 0.1);
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+  box-shadow: 0 0 10px rgba(0, 255, 136, 0.1);
+}
+
+.mode-button.active-real {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+  box-shadow: 0 0 10px rgba(0, 212, 255, 0.1);
+}
+
+/* Stop Button */
+.stop-button {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 51, 102, 0.05);
+  border: 1px solid rgba(255, 51, 102, 0.2);
+  border-radius: 8px;
+  color: var(--accent-red);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.stop-button:hover {
+  background: rgba(255, 51, 102, 0.15);
+  border-color: var(--accent-red);
+}
+
+.stop-button.active-stop {
+  background: rgba(255, 51, 102, 0.2);
+  border-color: var(--accent-red);
+  box-shadow: 0 0 15px rgba(255, 51, 102, 0.2);
+}

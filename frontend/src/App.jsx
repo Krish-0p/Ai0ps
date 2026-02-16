@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, ReferenceLine } from 'recharts';
-import { Shield, Activity, FileText, Zap, Upload, Terminal, Play, Pause, Server, AlertTriangle, TrendingUp, Clock, Cpu } from 'lucide-react';
+import { Shield, Activity, FileText, Zap, Upload, Terminal, Play, Pause, Server, AlertTriangle, TrendingUp, Clock, Cpu, Monitor, StopCircle } from 'lucide-react';
 import './App.css';
 
 const API_URL = "http://localhost:8000/api";
@@ -9,7 +9,7 @@ const API_URL = "http://localhost:8000/api";
 function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isRunning, setIsRunning] = useState(true);
+  const [mode, setMode] = useState("stopped"); // 'real', 'fake', 'stopped'
   const [alertPulse, setAlertPulse] = useState(false);
   const fileInputRef = useRef(null);
   const prevAnomalyRef = useRef(false);
@@ -17,14 +17,12 @@ function App() {
   // Poll Backend
   useEffect(() => {
     const interval = setInterval(() => {
-      if (!isRunning) return;
       fetchData();
     }, 1000);
     
     fetchData();
-    
     return () => clearInterval(interval);
-  }, [isRunning]);
+  }, []);
 
   // Trigger alert animation when anomaly state changes
   useEffect(() => {
@@ -34,8 +32,10 @@ function App() {
     }
     if (data) {
       prevAnomalyRef.current = data.is_anomaly;
+      // Sync mode from backend if it changes externally
+      if (data.mode) setMode(data.mode);
     }
-  }, [data?.is_anomaly]);
+  }, [data?.is_anomaly, data?.mode]);
 
   const fetchData = async () => {
     try {
@@ -47,9 +47,15 @@ function App() {
     }
   };
 
-  const toggleMonitor = async () => {
-    const newState = !isRunning;
-    setIsRunning(newState);
+  const switchMode = async (newMode) => {
+    try {
+      // Optimistic update
+      setMode(newMode);
+      await axios.post(`${API_URL}/control/switch-mode/${newMode}`);
+    } catch (error) {
+      console.error("Failed to switch mode", error);
+      alert("Failed to switch mode. Check console.");
+    }
   };
 
   const handleInjectAttack = async () => {
@@ -99,23 +105,37 @@ function App() {
           </div>
         </div>
 
-        {/* Monitor Toggle */}
+        {/* DATA SOURCE TOGGLE (NEW) */}
         <div className="control-section">
+          <div className="section-label">DATA SOURCE</div>
           <div className="control-card">
-            <div className="control-header">
-              <span className="control-label">Monitor Status</span>
-              <div className={`status-indicator ${isRunning ? 'active' : 'inactive'}`}>
-                <span className="status-dot"></span>
-                {isRunning ? 'ACTIVE' : 'PAUSED'}
-              </div>
+            
+            <div className="mode-grid">
+              <button 
+                onClick={() => switchMode("fake")}
+                className={`mode-button ${mode === 'fake' ? 'active-fake' : ''}`}
+              >
+                <div className="mode-icon"><Zap size={16} /></div>
+                <span>Fake Logs</span>
+              </button>
+
+              <button 
+                onClick={() => switchMode("real")}
+                className={`mode-button ${mode === 'real' ? 'active-real' : ''}`}
+              >
+                <div className="mode-icon"><Monitor size={16} /></div>
+                <span>Real PC</span>
+              </button>
             </div>
+
             <button 
-              onClick={toggleMonitor}
-              className={`toggle-button ${isRunning ? 'running' : 'paused'}`}
+              onClick={() => switchMode("stopped")}
+              className={`stop-button ${mode === 'stopped' ? 'active-stop' : ''}`}
             >
-              {isRunning ? <Pause size={18} /> : <Play size={18} />}
-              <span>{isRunning ? 'Pause Monitor' : 'Start Monitor'}</span>
+              <StopCircle size={16} />
+              <span>STOP LOGGING</span>
             </button>
+
           </div>
         </div>
 
@@ -125,16 +145,12 @@ function App() {
           <button 
             onClick={handleInjectAttack}
             className="attack-button"
+            disabled={mode === 'real' || mode === 'stopped'} // Disable if not in fake mode
+            style={{ opacity: mode === 'fake' ? 1 : 0.5, cursor: mode === 'fake' ? 'pointer' : 'not-allowed' }}
           >
-            <Zap className="attack-icon" />
-            <span>Inject DDoS Attack</span>
+            <AlertTriangle className="attack-icon" />
+            <span>Inject Attack (Fake Mode Only)</span>
           </button>
-          <div className="help-box">
-            <div className="help-icon">💡</div>
-            <div className="help-text">
-              Simulate a distributed denial-of-service attack to test anomaly detection
-            </div>
-          </div>
         </div>
 
         {/* File Upload */}
@@ -206,16 +222,16 @@ function App() {
         {/* KPI Grid */}
         <div className="kpi-grid">
           <KpiCard 
-            title="Server Status" 
-            value={data.server_status} 
-            icon={<Server size={24}/>} 
-            trend="+2.3%"
-            colorClass="blue"
+            title="Current Mode" 
+            value={mode.toUpperCase()} 
+            icon={<Activity size={24}/>} 
+            trend="Active"
+            colorClass={mode === 'real' ? "blue" : (mode === 'fake' ? "green" : "purple")}
           />
           <KpiCard 
             title="AI Diagnosis" 
             value={data.ai_diagnosis} 
-            icon={<Activity size={24}/>} 
+            icon={<Shield size={24}/>} 
             trend={data.is_anomaly ? "CRITICAL" : "NORMAL"}
             colorClass={data.is_anomaly ? "red" : "green"}
             pulsate={data.is_anomaly}
@@ -231,7 +247,7 @@ function App() {
             title="Log Volume" 
             value={data.log_volume} 
             icon={<FileText size={24}/>}
-            trend="Events/sec"
+            trend="Window: 20"
             colorClass="purple"
           />
         </div>
@@ -255,7 +271,13 @@ function App() {
             </div>
             <div className="chart-wrapper">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={data.history} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                {/* 👇👇👇 THE FIX IS HERE 👇👇👇 
+                   .slice(-50) keeps only the last 50 items 
+                */}
+                <AreaChart 
+                  data={data.history.slice(-50)} 
+                  margin={{ top: 10, right: 10, left: -20, bottom: 0 }}
+                >
                   <defs>
                     <linearGradient id="colorScore" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor={data.is_anomaly ? "#ff3366" : "#00d4ff"} stopOpacity={0.6}/>
@@ -270,7 +292,7 @@ function App() {
                     </filter>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" vertical={false} />
-                  <XAxis dataKey="time" hide />
+                  <XAxis dataKey="time" hide /> 
                   <YAxis domain={[-0.8, 0.8]} stroke="rgba(255,255,255,0.2)" tick={{ fill: 'rgba(255,255,255,0.4)', fontSize: 11 }} />
                   <Tooltip 
                     contentStyle={{ 
@@ -289,7 +311,8 @@ function App() {
                     stroke={data.is_anomaly ? "#ff3366" : "#00d4ff"} 
                     strokeWidth={3}
                     fill="url(#colorScore)" 
-                    isAnimationActive={false}
+                    isAnimationActive={true} /* Enable animation for smoothness */
+                    animationDuration={300}
                     filter="url(#glow)"
                   />
                 </AreaChart>
@@ -316,7 +339,7 @@ function App() {
             <div className="terminal-header">
               <div className="terminal-title">
                 <Terminal size={16} />
-                <span>SYSTEM LOGS</span>
+                <span>SYSTEM LOGS ({mode.toUpperCase()})</span>
               </div>
               <div className="terminal-controls">
                 <div className="terminal-dot red"></div>
@@ -327,10 +350,16 @@ function App() {
             <div className="terminal-content">
               {data.logs.slice().reverse().map((log, idx) => (
                 <div key={idx} className={`log-line ${log.includes("ERROR") || log.includes("Attack") ? "error" : ""}`}>
-                  <span className="log-time">[{new Date().toLocaleTimeString()}]</span>
-                  <span className="log-message">{log}</span>
+                  <span className="log-time">[{log.split(' ')[1] || new Date().toLocaleTimeString()}]</span>
+                  <span className="log-message">{log.substring(log.indexOf(' ') + 1)}</span>
                 </div>
               ))}
+              {data.logs.length === 0 && (
+                <div className="log-line">
+                  <span className="log-time">[{new Date().toLocaleTimeString()}]</span>
+                  <span className="log-message" style={{color: '#64748b'}}>Waiting for logs... (Status: {mode})</span>
+                </div>
+              )}
             </div>
             <div className="terminal-footer">
               <span className="terminal-cursor">▊</span>
